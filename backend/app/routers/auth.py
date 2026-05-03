@@ -29,6 +29,33 @@ def setup(data: UserCreate, db: Session = Depends(get_db)) -> Token:
     return Token(access_token=create_access_token(str(user.id)))
 
 
+@router.post("/signup", response_model=Token)
+def signup(data: UserCreate, db: Session = Depends(get_db)) -> Token:
+    """Create a regular (non-admin) account.
+
+    Available at any time. New users are AI-enabled by default — the admin can
+    toggle that off from /admin. The login literal "Admin" is reserved for the
+    seeded admin account; reject collisions.
+    """
+    email = data.email.strip()
+    if email.lower() == "admin":
+        raise HTTPException(status_code=400, detail="That username is reserved.")
+    existing = db.query(User).filter(User.email == email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="That email is already registered.")
+    user = User(
+        email=email,
+        password_hash=hash_password(data.password),
+        is_admin=False,
+        ai_enabled=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    seed_default_categories(db, user.id)
+    return Token(access_token=create_access_token(str(user.id)))
+
+
 @router.post("/login", response_model=Token)
 def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)) -> Token:
     user = db.query(User).filter(User.email == form.username).first()

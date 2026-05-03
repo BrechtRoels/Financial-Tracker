@@ -34,6 +34,11 @@ export async function setupRequest(email: string, password: string) {
   setToken(data.access_token);
 }
 
+export async function signupRequest(email: string, password: string) {
+  const { data } = await api.post("/auth/signup", { email, password });
+  setToken(data.access_token);
+}
+
 export async function setupRequired(): Promise<boolean> {
   const { data } = await api.get("/auth/setup-required");
   return data.setup_required;

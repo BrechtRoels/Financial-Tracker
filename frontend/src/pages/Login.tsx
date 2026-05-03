@@ -1,11 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { loginRequest, setupRequired, setupRequest } from "../hooks/useAuth";
+import { loginRequest, setupRequired, setupRequest, signupRequest } from "../hooks/useAuth";
 
 export default function Login() {
   const nav = useNavigate();
-  const [mode, setMode] = useState<"login" | "setup">("login");
-  const [setupAllowed, setSetupAllowed] = useState<boolean | null>(null);
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [firstUser, setFirstUser] = useState<boolean>(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -14,10 +14,10 @@ export default function Login() {
   useEffect(() => {
     setupRequired()
       .then((req) => {
-        setSetupAllowed(req);
-        setMode(req ? "setup" : "login");
+        setFirstUser(req);
+        if (req) setMode("signup");
       })
-      .catch(() => setSetupAllowed(false));
+      .catch(() => setFirstUser(false));
   }, []);
 
   async function onSubmit(e: FormEvent) {
@@ -25,8 +25,12 @@ export default function Login() {
     setErr(null);
     setLoading(true);
     try {
-      if (mode === "setup") await setupRequest(email, password);
-      else await loginRequest(email, password);
+      if (mode === "signup") {
+        if (firstUser) await setupRequest(email, password);
+        else await signupRequest(email, password);
+      } else {
+        await loginRequest(email, password);
+      }
       nav("/");
     } catch (e: any) {
       setErr(e.response?.data?.detail ?? "Something went wrong");
@@ -34,8 +38,6 @@ export default function Login() {
       setLoading(false);
     }
   }
-
-  const canToggle = setupAllowed === true || mode === "setup";
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -45,20 +47,26 @@ export default function Login() {
             Finance Tracker
           </div>
           <h1 className="mt-2 text-xl font-semibold">
-            {mode === "setup" ? "Welcome — let's set up" : "Welcome back"}
+            {mode === "signup"
+              ? firstUser
+                ? "Welcome — let's set up"
+                : "Create your account"
+              : "Welcome back"}
           </h1>
           <p className="text-sm text-subink">
-            {mode === "setup"
-              ? "Create your single user account to begin."
+            {mode === "signup"
+              ? firstUser
+                ? "Create the first user to begin."
+                : "Sign up to start tracking."
               : "Sign in to your finance tracker."}
           </p>
         </div>
         <form onSubmit={onSubmit} className="flex flex-col gap-3">
           <div>
-            <div className="label mb-1">{mode === "setup" ? "Email" : "Email or username"}</div>
+            <div className="label mb-1">{mode === "signup" ? "Email" : "Email or username"}</div>
             <input
               className="input"
-              type={mode === "setup" ? "email" : "text"}
+              type={mode === "signup" ? "email" : "text"}
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -78,42 +86,40 @@ export default function Login() {
           </div>
           {err && <div className="text-xs text-neg">{err}</div>}
           <button className="btn-primary mt-2" disabled={loading}>
-            {loading ? "…" : mode === "setup" ? "Create account" : "Sign in"}
+            {loading ? "…" : mode === "signup" ? "Create account" : "Sign in"}
           </button>
         </form>
-        {canToggle && (
-          <div className="mt-4 text-center text-sm text-subink">
-            {mode === "setup" ? (
-              <>
-                Already have an account?{" "}
-                <button
-                  type="button"
-                  className="text-brand-accent hover:underline font-medium"
-                  onClick={() => {
-                    setErr(null);
-                    setMode("login");
-                  }}
-                >
-                  Sign in
-                </button>
-              </>
-            ) : (
-              <>
-                First time here?{" "}
-                <button
-                  type="button"
-                  className="text-brand-accent hover:underline font-medium"
-                  onClick={() => {
-                    setErr(null);
-                    setMode("setup");
-                  }}
-                >
-                  Create account
-                </button>
-              </>
-            )}
-          </div>
-        )}
+        <div className="mt-4 text-center text-sm text-subink">
+          {mode === "signup" ? (
+            <>
+              Already have an account?{" "}
+              <button
+                type="button"
+                className="text-brand-accent hover:underline font-medium"
+                onClick={() => {
+                  setErr(null);
+                  setMode("login");
+                }}
+              >
+                Sign in
+              </button>
+            </>
+          ) : (
+            <>
+              New here?{" "}
+              <button
+                type="button"
+                className="text-brand-accent hover:underline font-medium"
+                onClick={() => {
+                  setErr(null);
+                  setMode("signup");
+                }}
+              >
+                Create account
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
