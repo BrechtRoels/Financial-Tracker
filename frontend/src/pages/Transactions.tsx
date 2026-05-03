@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import EditTransactionModal from "../components/EditTransactionModal";
 import Modal from "../components/Modal";
 import Select from "../components/Select";
 import ProgressBar from "../components/ProgressBar";
 import { API_BASE_URL, api, getToken } from "../api/client";
 import { useAccounts, useCategories, useInvalidate, useMutateResource, useTransactions } from "../api/hooks";
+import { scanReceipt } from "../api/receipts";
 import type { Transaction } from "../api/types";
-import { formatDate, formatEUR, toCents, todayISO } from "../lib/format";
+import { formatDate, formatEUR, fromCents, toCents, todayISO } from "../lib/format";
 
 type TxForm = {
   kind: "expense" | "income" | "transfer";
@@ -36,6 +37,48 @@ export default function Transactions() {
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [form, setForm] = useState<TxForm>(empty);
   const [filter, setFilter] = useState<{ account_id?: number; category_id?: number }>({});
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanHint, setScanHint] = useState<string | null>(null);
+  const scanInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function onScanFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setScanning(true);
+    setScanError(null);
+    setScanHint(null);
+    try {
+      const r = await scanReceipt(file);
+      if (r.error) {
+        setScanError(
+          r.error === "not_a_receipt"
+            ? "That doesn't look like a receipt — try another photo."
+            : "Couldn't read the receipt. Try a clearer photo."
+        );
+        return;
+      }
+      setForm((f) => ({
+        ...f,
+        kind: "expense",
+        amount: r.total_amount_cents != null ? fromCents(r.total_amount_cents).toFixed(2) : f.amount,
+        occurred_on: r.occurred_on ?? f.occurred_on,
+        merchant: r.merchant ?? f.merchant,
+        description: r.description ?? f.description,
+        category_id: r.category_id ?? f.category_id,
+      }));
+      setScanHint(
+        r.confidence != null
+          ? `Filled from photo · confidence ${Math.round(r.confidence * 100)}%`
+          : "Filled from photo"
+      );
+    } catch (err: any) {
+      setScanError(err.response?.data?.detail ?? err.message ?? "Scan failed");
+    } finally {
+      setScanning(false);
+    }
+  }
 
   const accounts = useAccounts();
   const categories = useCategories();
@@ -92,6 +135,14 @@ export default function Transactions() {
     await create.mutateAsync(form);
     setOpen(false);
     setForm(empty);
+    setScanHint(null);
+    setScanError(null);
+  }
+
+  function closeAddModal() {
+    setOpen(false);
+    setScanHint(null);
+    setScanError(null);
   }
 
   return (
@@ -220,8 +271,33 @@ export default function Transactions() {
         </table>
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="New transaction">
+      <Modal open={open} onClose={closeAddModal} title="New transaction">
         <div className="flex flex-col gap-3">
+          <input
+            ref={scanInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={onScanFile}
+          />
+          <button
+            type="button"
+            onClick={() => scanInputRef.current?.click()}
+            disabled={scanning}
+            className="btn-ghost w-full justify-center gap-2 border border-dashed border-brand-accent/40 text-brand-accent hover:bg-brand-50"
+          >
+            {scanning ? (
+              <>
+                <span className="inline-block h-3 w-3 rounded-full border-2 border-brand-accent border-t-transparent animate-spin" />
+                Reading receipt…
+              </>
+            ) : (
+              <>📷 Scan receipt</>
+            )}
+          </button>
+          {scanHint && <div className="text-xs text-pos">{scanHint}</div>}
+          {scanError && <div className="text-xs text-neg">{scanError}</div>}
+
           <div className="inline-flex rounded-lg border border-line p-0.5 bg-brand-50/50 self-start">
             {(["expense", "income", "transfer"] as const).map((k) => (
               <button

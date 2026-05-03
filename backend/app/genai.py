@@ -192,6 +192,90 @@ Output ONLY a JSON object {{"input": "Canonical", ...}}. No prose.
 """
 
 
+_RECEIPT_PROMPT = """You read a photo of a receipt or invoice and extract structured fields.
+
+Return ONE JSON object — no prose, no markdown, no code fences — with:
+- "total_amount": float — the final total paid, in the receipt's currency. Always a positive number.
+- "currency": 3-letter ISO code ("EUR", "USD", "GBP"). Best guess from the receipt; default "EUR".
+- "date": ISO YYYY-MM-DD if visible, else null.
+- "merchant": short brand / shop name (e.g. "Albert Heijn", not the legal entity or street address). null if unreadable.
+- "category": one of the category names from the list below, or null if nothing clearly fits.
+- "description": short human-readable summary of the purchase (e.g. "Weekly groceries", "Lunch with Tom"). null if not enough info.
+- "confidence": 0.0–1.0, how confident you are in `total_amount`.
+
+If the image is unreadable or clearly not a receipt, return:
+{"error": "not_a_receipt"}
+
+Available categories:
+{categories}
+
+Output strictly the JSON object. Nothing else.
+"""
+
+
+async def scan_receipt_image(
+    image_b64_data_url: str,
+    categories: list[dict[str, str]],
+) -> dict[str, Any]:
+    """Send a base64 image data URL to the vision model and parse the JSON.
+
+    `categories` is a list of {"name": ..., "kind": "expense"|"income"} dicts —
+    the model is told to pick one or return null. Returns {} on failure so
+    callers can fall back to an empty form.
+    """
+    if not settings.genai_enabled:
+        return {}
+    cat_lines = "\n".join(f"- {c['name']}" for c in categories if c.get("kind") == "expense")
+    prompt = _RECEIPT_PROMPT.replace("{categories}", cat_lines or "(none)")
+
+    headers = {"api-key": settings.genai_api_key, "Content-Type": "application/json"}
+    params = {"api-version": settings.genai_api_version} if settings.genai_api_version else {}
+    payload = {
+        "model": settings.genai_vision_model,
+        "input": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": prompt},
+                    {"type": "input_image", "image_url": image_b64_data_url},
+                ],
+            }
+        ],
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                f"{settings.genai_base_url}/v1/responses",
+                headers=headers,
+                params=params,
+                json=payload,
+            )
+            resp.raise_for_status()
+            text = _extract_text(resp.json())
+    except Exception as e:
+        logger.warning("Receipt scan failed: %s", e)
+        return {}
+
+    try:
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.strip("`").strip()
+            if cleaned.lower().startswith("json"):
+                cleaned = cleaned[4:].lstrip()
+        m = re.search(r"\{[\s\S]*\}", cleaned)
+        if m:
+            cleaned = m.group(0)
+        parsed = json.loads(cleaned)
+    except Exception as e:
+        logger.warning("Could not parse receipt JSON: %s", e)
+        return {}
+
+    if not isinstance(parsed, dict):
+        return {}
+    return parsed
+
+
 async def canonicalize_merchants(names: list[str]) -> dict[str, str]:
     """Single LLM call. Maps each input string → canonical brand. Returns
     {} if AI is disabled or the LLM returns garbage."""

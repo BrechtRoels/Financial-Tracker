@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     genai_api_version: str = ""
     genai_llm_model: str = "openai.gpt-5-nano"
     genai_chat_model: str = "openai.gpt-5.4-mini"
+    genai_vision_model: str = "openai.gpt-5.4-nano"
 
     @property
     def genai_enabled(self) -> bool:

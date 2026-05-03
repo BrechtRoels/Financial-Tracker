@@ -15,7 +15,9 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..deps import get_current_user, get_db
-from ..genai import canonicalize_merchants, enrich_transactions_stream
+import base64
+
+from ..genai import canonicalize_merchants, enrich_transactions_stream, scan_receipt_image
 from ..models import Account, Category, CsvImport, Transaction, User
 from ..schemas import TransactionCreate, TransactionOut, TransactionUpdate, TransferCreate
 from .accounts import normalize_iban
@@ -531,6 +533,118 @@ def forget_imports(
     n = q.delete()
     db.commit()
     return {"forgotten": n}
+
+
+class ScanReceiptOut(BaseModel):
+    total_amount_cents: int | None = None
+    currency: str | None = None
+    occurred_on: date | None = None
+    merchant: str | None = None
+    description: str | None = None
+    category_id: int | None = None
+    confidence: float | None = None
+    error: str | None = None
+
+
+_ACCEPTED_IMAGE_TYPES = {
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+}
+
+
+@router.post("/scan-receipt", response_model=ScanReceiptOut)
+async def scan_receipt(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ScanReceiptOut:
+    """Take a receipt photo, return structured fields to prefill the add-tx form.
+
+    Calls the cheapest vision model on the configured GenAI proxy. Falls back
+    to all-null output (with `error`) on any AI failure — the UI just keeps the
+    form empty in that case.
+    """
+    if not settings.genai_enabled:
+        raise HTTPException(status_code=400, detail="AI is unavailable — set GENAI_API_KEY.")
+
+    mime = (file.content_type or "").lower()
+    if mime not in _ACCEPTED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported image type: {file.content_type or 'unknown'}",
+        )
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    if len(raw) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image too large (max 8 MB).")
+
+    data_url = f"data:{mime};base64,{base64.b64encode(raw).decode()}"
+
+    cats = (
+        db.query(Category)
+        .filter(Category.user_id == user.id)
+        .all()
+    )
+    parsed = await scan_receipt_image(
+        data_url,
+        [{"name": c.name, "kind": c.kind} for c in cats],
+    )
+
+    if not parsed:
+        return ScanReceiptOut(error="ai_failed")
+    if "error" in parsed:
+        return ScanReceiptOut(error=str(parsed["error"]))
+
+    total = parsed.get("total_amount")
+    cents: int | None = None
+    if isinstance(total, (int, float)) and total > 0:
+        cents = int(round(float(total) * 100))
+
+    raw_date = parsed.get("date")
+    occurred: date | None = None
+    if isinstance(raw_date, str):
+        try:
+            occurred = date.fromisoformat(raw_date[:10])
+        except ValueError:
+            occurred = None
+
+    cat_name = parsed.get("category")
+    cat_id: int | None = None
+    if isinstance(cat_name, str):
+        match = next(
+            (c for c in cats if c.name.lower() == cat_name.strip().lower()),
+            None,
+        )
+        if match:
+            cat_id = match.id
+
+    merchant = parsed.get("merchant")
+    if not isinstance(merchant, str) or not merchant.strip():
+        merchant = None
+    description = parsed.get("description")
+    if not isinstance(description, str) or not description.strip():
+        description = None
+    currency = parsed.get("currency")
+    if not isinstance(currency, str):
+        currency = None
+    confidence = parsed.get("confidence")
+    if not isinstance(confidence, (int, float)):
+        confidence = None
+
+    return ScanReceiptOut(
+        total_amount_cents=cents,
+        currency=currency,
+        occurred_on=occurred,
+        merchant=merchant.strip()[:120] if merchant else None,
+        description=description.strip()[:240] if description else None,
+        category_id=cat_id,
+        confidence=float(confidence) if confidence is not None else None,
+    )
 
 
 @router.post("/import-csv")
