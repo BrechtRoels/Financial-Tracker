@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import MobileSheet from "./MobileSheet";
+import LinkRefundModal from "../LinkRefundModal";
 import Select from "../Select";
 import { api } from "../../api/client";
 import { useAccounts, useCategories, useInvalidate } from "../../api/hooks";
 import type { Transaction } from "../../api/types";
 import { fromCents, toCents } from "../../lib/format";
+
+const REFUND_CATEGORY_RE = /refund|payback|reimburs|repaid|paid back/i;
 
 type FormState = {
   account_id: string;
@@ -39,8 +42,19 @@ export default function MobileEditTransactionSheet({
   const [form, setForm] = useState<FormState>(empty);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [linkOpen, setLinkOpen] = useState(false);
 
   const isTransfer = !!transaction?.transfer_group_id;
+  const amountNum = parseFloat(form.amount || "0");
+  const isPositive = amountNum > 0;
+  const selectedCat = useMemo(
+    () =>
+      form.category_id
+        ? (categories.data ?? []).find((c) => c.id === Number(form.category_id))
+        : null,
+    [form.category_id, categories.data]
+  );
+  const isRefundLikeCategory = !!selectedCat && REFUND_CATEGORY_RE.test(selectedCat.name);
 
   useEffect(() => {
     if (!open || !transaction) {
@@ -186,6 +200,37 @@ export default function MobileEditTransactionSheet({
           />
         </div>
 
+        {!isTransfer && isPositive && transaction && (
+          <div
+            className={`rounded-lg border px-3 py-2.5 text-xs ${
+              isRefundLikeCategory
+                ? "bg-emerald-50 border-emerald-200/70"
+                : "bg-brand-50/40 border-line"
+            }`}
+          >
+            <div className="font-medium text-ink mb-1">
+              {transaction.refund_for_id
+                ? `Linked as refund of expense #${transaction.refund_for_id}`
+                : "Refund of an earlier expense?"}
+            </div>
+            <div className="text-subink mb-2">
+              {transaction.refund_for_id
+                ? "Category mirrored from the linked expense."
+                : isRefundLikeCategory
+                  ? "Pick the original expense so it's clear what was paid back."
+                  : "Optional — useful for friend paybacks or returns."}
+            </div>
+            <button
+              type="button"
+              className="btn-ghost h-10 w-full justify-center text-xs"
+              onClick={() => setLinkOpen(true)}
+              disabled={busy}
+            >
+              {transaction.refund_for_id ? "Change link…" : "Link to expense…"}
+            </button>
+          </div>
+        )}
+
         {err && <div className="text-xs text-neg">{err}</div>}
 
         <div className="flex gap-2 pt-1">
@@ -207,6 +252,11 @@ export default function MobileEditTransactionSheet({
           </button>
         </div>
       </div>
+      <LinkRefundModal
+        open={linkOpen}
+        onClose={() => setLinkOpen(false)}
+        refund={transaction}
+      />
     </MobileSheet>
   );
 }

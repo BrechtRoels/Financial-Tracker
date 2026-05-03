@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import EditTransactionModal from "../components/EditTransactionModal";
+import LinkRefundModal from "../components/LinkRefundModal";
 import Modal from "../components/Modal";
 import Select from "../components/Select";
 import ProgressBar from "../components/ProgressBar";
@@ -8,6 +9,8 @@ import { useAccounts, useCategories, useInvalidate, useMutateResource, useTransa
 import { scanReceipt } from "../api/receipts";
 import type { Transaction } from "../api/types";
 import { formatDate, formatEUR, fromCents, toCents, todayISO } from "../lib/format";
+
+const REFUND_CATEGORY_RE = /refund|payback|reimburs|repaid|paid back/i;
 
 type TxForm = {
   kind: "expense" | "income" | "transfer";
@@ -41,6 +44,7 @@ export default function Transactions() {
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanHint, setScanHint] = useState<string | null>(null);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
+  const [linkingTx, setLinkingTx] = useState<Transaction | null>(null);
 
   async function onScanFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -132,11 +136,24 @@ export default function Transactions() {
   );
 
   async function submit() {
-    await create.mutateAsync(form);
+    const resp: any = await create.mutateAsync(form);
+    const newTx = (resp?.data ?? resp) as Transaction | undefined;
+    const pickedCat = form.category_id
+      ? (categories.data ?? []).find((c) => c.id === Number(form.category_id))
+      : null;
     setOpen(false);
     setForm(empty);
     setScanHint(null);
     setScanError(null);
+
+    if (
+      newTx?.id &&
+      newTx.amount_cents > 0 &&
+      pickedCat &&
+      REFUND_CATEGORY_RE.test(pickedCat.name)
+    ) {
+      setLinkingTx(newTx);
+    }
   }
 
   function closeAddModal() {
@@ -396,6 +413,12 @@ export default function Transactions() {
         open={editing != null}
         onClose={() => setEditing(null)}
         transaction={editing}
+      />
+
+      <LinkRefundModal
+        open={linkingTx != null}
+        onClose={() => setLinkingTx(null)}
+        refund={linkingTx}
       />
     </div>
   );

@@ -19,22 +19,32 @@ export default function LinkRefundModal({ open, onClose, refund }: Props) {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [allExpenses, setAllExpenses] = useState(false);
 
   useEffect(() => {
     if (!open || !refund) {
       setCandidates([]);
+      setSearch("");
+      setAllExpenses(false);
       return;
     }
     setErr(null);
     setLoading(true);
-    api
-      .get<RefundCandidate[]>(`/transactions/${refund.id}/refund-candidates`)
-      .then((r) => setCandidates(r.data))
-      .catch((e) =>
-        setErr(e.response?.data?.detail ?? e.message ?? "Failed to load candidates")
-      )
-      .finally(() => setLoading(false));
-  }, [open, refund]);
+    const handle = setTimeout(() => {
+      const params: Record<string, string> = {};
+      if (search.trim()) params.q = search.trim();
+      if (allExpenses) params.all_expenses = "true";
+      api
+        .get<RefundCandidate[]>(`/transactions/${refund.id}/refund-candidates`, { params })
+        .then((r) => setCandidates(r.data))
+        .catch((e) =>
+          setErr(e.response?.data?.detail ?? e.message ?? "Failed to load candidates")
+        )
+        .finally(() => setLoading(false));
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [open, refund, search, allExpenses]);
 
   async function link(expenseId: number) {
     if (!refund) return;
@@ -87,11 +97,31 @@ export default function LinkRefundModal({ open, onClose, refund }: Props) {
           category total nets out.
         </p>
 
-        {loading && <div className="text-xs text-subink py-4">Searching for candidates…</div>}
+        <input
+          type="search"
+          placeholder="Search merchant or description…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="input"
+        />
+
+        <label className="flex items-center gap-2 text-xs text-subink">
+          <input
+            type="checkbox"
+            checked={allExpenses}
+            onChange={(e) => setAllExpenses(e.target.checked)}
+            className="h-3.5 w-3.5 accent-brand-accent"
+          />
+          Show all expenses (drop date / amount filter — useful for friend paybacks)
+        </label>
+
+        {loading && <div className="text-xs text-subink py-4">Searching…</div>}
 
         {!loading && candidates.length === 0 && (
           <div className="text-xs text-subink py-4">
-            No matching expenses found within ±60 days at 50–150% of the refund amount.
+            {search.trim() || allExpenses
+              ? "No expenses match."
+              : "No matching expenses found within ±60 days at 50–150% of the refund amount. Try the search field or tick \"Show all expenses\"."}
           </div>
         )}
 

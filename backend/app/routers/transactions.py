@@ -400,13 +400,22 @@ class LinkRefundIn(BaseModel):
 @router.get("/{tx_id}/refund-candidates", response_model=list[RefundCandidateOut])
 def refund_candidates(
     tx_id: int,
+    q: str | None = Query(None, description="Optional text filter on merchant / description."),
+    all_expenses: bool = Query(
+        False,
+        description="When true, drop the date / amount-range heuristics so any expense can match — useful for friend paybacks where the original purchase was earlier.",
+    ),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Find candidate expense transactions a positive (refund) row could offset.
 
-    Heuristic: same merchant if available, or same counterparty_name; expense
-    amount within 50–150% of the refund amount; date within ±60 days.
+    Default heuristic: amount within 50–150% of the refund, date within ±60 days.
+    Same-merchant / same-counterparty matches rank higher but are no longer a
+    hard filter — that way a friend repaying you (different "merchant" than the
+    original purchase) can still find candidates. Pass `all_expenses=true` to
+    drop the date and amount restrictions entirely; pass `q=...` to text-filter
+    by merchant / description.
     """
     refund = (
         db.query(Transaction)
@@ -418,29 +427,33 @@ def refund_candidates(
     if refund.amount_cents <= 0:
         raise HTTPException(status_code=400, detail="Only positive transactions can be linked as refunds")
 
-    target_abs = refund.amount_cents  # how much was refunded
-    lo = int(target_abs * 0.5)
-    hi = int(target_abs * 1.5)
-    earliest = refund.occurred_on - timedelta(days=60)
-    latest = refund.occurred_on + timedelta(days=60)
+    target_abs = refund.amount_cents
 
-    q = (
-        db.query(Transaction)
-        .filter(
-            Transaction.user_id == user.id,
-            Transaction.id != tx_id,
-            Transaction.amount_cents < 0,
-            Transaction.transfer_group_id.is_(None),
+    query = db.query(Transaction).filter(
+        Transaction.user_id == user.id,
+        Transaction.id != tx_id,
+        Transaction.amount_cents < 0,
+        Transaction.transfer_group_id.is_(None),
+    )
+
+    if not all_expenses:
+        lo = int(target_abs * 0.5)
+        hi = int(target_abs * 1.5)
+        earliest = refund.occurred_on - timedelta(days=60)
+        latest = refund.occurred_on + timedelta(days=60)
+        query = query.filter(
             Transaction.occurred_on >= earliest,
             Transaction.occurred_on <= latest,
             (-Transaction.amount_cents).between(lo, hi),
         )
-    )
-    if refund.merchant:
-        q = q.filter(Transaction.merchant == refund.merchant)
-    elif refund.counterparty_name:
-        q = q.filter(Transaction.counterparty_name == refund.counterparty_name)
-    rows = q.order_by(Transaction.occurred_on.desc()).limit(15).all()
+
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            (Transaction.merchant.ilike(like)) | (Transaction.description.ilike(like))
+        )
+
+    rows = query.order_by(Transaction.occurred_on.desc()).limit(50).all()
 
     out = [
         RefundCandidateOut(
@@ -455,8 +468,18 @@ def refund_candidates(
         )
         for r in rows
     ]
-    out.sort(key=lambda c: (c.days_apart, abs(abs(c.amount_cents) - target_abs)))
-    return out
+
+    # Rank: same-merchant / same-counterparty first, then closer in time, then closer in amount.
+    def _rank(c: RefundCandidateOut) -> tuple:
+        same_merchant = bool(refund.merchant and c.merchant and refund.merchant == c.merchant)
+        return (
+            0 if same_merchant else 1,
+            c.days_apart,
+            abs(abs(c.amount_cents) - target_abs),
+        )
+
+    out.sort(key=_rank)
+    return out[:25]
 
 
 @router.post("/{tx_id}/link-refund", response_model=TransactionOut)

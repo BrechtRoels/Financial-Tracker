@@ -1,10 +1,14 @@
 import { useRef, useState } from "react";
+import LinkRefundModal from "../LinkRefundModal";
 import MobileSheet from "./MobileSheet";
 import Select from "../Select";
 import { api } from "../../api/client";
 import { useAccounts, useCategories, useMutateResource } from "../../api/hooks";
 import { scanReceipt } from "../../api/receipts";
+import type { Transaction } from "../../api/types";
 import { fromCents, toCents, todayISO } from "../../lib/format";
+
+const REFUND_CATEGORY_RE = /refund|payback|reimburs|repaid|paid back/i;
 
 type TxForm = {
   kind: "expense" | "income" | "transfer";
@@ -51,6 +55,7 @@ export default function AddTransactionSheet({
   const [scanning, setScanning] = useState(false);
   const [scanHint, setScanHint] = useState<string | null>(null);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
+  const [linkingTx, setLinkingTx] = useState<Transaction | null>(null);
 
   async function onScanFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -121,9 +126,21 @@ export default function AddTransactionSheet({
   async function submit() {
     setErr(null);
     try {
-      await create.mutateAsync(form);
+      const resp: any = await create.mutateAsync(form);
+      const newTx = (resp?.data ?? resp) as Transaction | undefined;
+      const pickedCat = form.category_id
+        ? (categories.data ?? []).find((c) => c.id === Number(form.category_id))
+        : null;
       setForm(empty);
       onClose();
+      if (
+        newTx?.id &&
+        newTx.amount_cents > 0 &&
+        pickedCat &&
+        REFUND_CATEGORY_RE.test(pickedCat.name)
+      ) {
+        setLinkingTx(newTx);
+      }
     } catch (e: any) {
       setErr(e.response?.data?.detail ?? e.message ?? "Save failed");
     }
@@ -273,6 +290,11 @@ export default function AddTransactionSheet({
           {create.isPending ? "Saving…" : "Save"}
         </button>
       </div>
+      <LinkRefundModal
+        open={linkingTx != null}
+        onClose={() => setLinkingTx(null)}
+        refund={linkingTx}
+      />
     </MobileSheet>
   );
 }
