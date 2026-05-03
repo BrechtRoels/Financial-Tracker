@@ -1,3 +1,6 @@
+import os
+from urllib.parse import parse_qs, urlparse, urlunparse
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -12,11 +15,32 @@ def _build_engine():
     The `sqlalchemy-libsql` driver handles the network layer; we still get a
     SQLite-compatible dialect so all our existing queries (`strftime`, `iif`,
     `PRAGMA table_info`) keep working.
+
+    For libSQL we pull `authToken` and `secure` out of the URL query string and
+    pass them as `connect_args` instead, because SQLAlchemy's URL parser does
+    not always forward unknown query params to the dialect cleanly.
     """
     url = settings.database_url
     if url.startswith("sqlite+libsql"):
-        # Network DB — no thread-safety arg, no PRAGMA hack needed.
-        return create_engine(url, future=True, pool_pre_ping=True)
+        parsed = urlparse(url)
+        qs = parse_qs(parsed.query)
+        auth_token = (
+            (qs.get("authToken") or [None])[0]
+            or os.environ.get("LIBSQL_AUTH_TOKEN")
+            or os.environ.get("TURSO_AUTH_TOKEN")
+        )
+        secure = (qs.get("secure") or ["true"])[0].lower() == "true"
+        clean_url = urlunparse(
+            (parsed.scheme, parsed.netloc, parsed.path or "/", "", "", "")
+        )
+        connect_args: dict = {}
+        if auth_token:
+            connect_args["auth_token"] = auth_token
+        if secure:
+            connect_args["secure"] = True
+        return create_engine(
+            clean_url, connect_args=connect_args, future=True, pool_pre_ping=True
+        )
     if url.startswith("sqlite"):
         return create_engine(
             url,
