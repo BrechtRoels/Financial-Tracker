@@ -3,7 +3,7 @@ import EditTransactionModal from "../components/EditTransactionModal";
 import Modal from "../components/Modal";
 import Select from "../components/Select";
 import ProgressBar from "../components/ProgressBar";
-import { api, getToken } from "../api/client";
+import { API_BASE_URL, api, getToken } from "../api/client";
 import { useAccounts, useCategories, useInvalidate, useMutateResource, useTransactions } from "../api/hooks";
 import type { Transaction } from "../api/types";
 import { formatDate, formatEUR, toCents, todayISO } from "../lib/format";
@@ -374,7 +374,7 @@ function ImportCSVModal({ open, onClose }: { open: boolean; onClose: () => void 
     fd.append("use_ai", String(useAI));
 
     try {
-      const resp = await fetch("/api/transactions/import-csv", {
+      const resp = await fetch(`${API_BASE_URL}/transactions/import-csv`, {
         method: "POST",
         headers: { Authorization: `Bearer ${getToken() ?? ""}` },
         body: fd,

@@ -141,13 +141,27 @@ def render_chart_png(
 
 
 def _readonly_engine():
+    """Build a separate engine for the SQL chat tool.
+
+    For plain SQLite we use `mode=ro` URI so writes are physically rejected.
+    For libSQL/Turso (network DB) we don't have a read-only dialect, but
+    `validate_sql()` already blocks anything that isn't a single SELECT/WITH
+    statement, so we just return the main engine.
+    """
     url = settings.database_url
-    if not url.startswith("sqlite"):
-        raise RuntimeError("SQL tool only supports sqlite")
-    path = url.split("sqlite:///", 1)[1]
-    # Use URI mode=ro so writes are rejected by SQLite itself.
-    ro_url = f"sqlite:///file:{quote(path, safe='/.-_')}?mode=ro&uri=true"
-    return create_engine(ro_url, connect_args={"uri": True, "check_same_thread": False})
+    if url.startswith("sqlite+libsql"):
+        # Reuse the main engine — write protection comes from validate_sql.
+        from .db import engine as main_engine
+
+        return main_engine
+    if url.startswith("sqlite:///"):
+        path = url.split("sqlite:///", 1)[1]
+        ro_url = f"sqlite:///file:{quote(path, safe='/.-_')}?mode=ro&uri=true"
+        return create_engine(ro_url, connect_args={"uri": True, "check_same_thread": False})
+    # Non-SQLite (Postgres, etc.) — same fallback as libSQL.
+    from .db import engine as main_engine
+
+    return main_engine
 
 
 _ro_engine = None

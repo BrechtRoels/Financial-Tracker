@@ -1,6 +1,12 @@
 import axios from "axios";
 
-export const api = axios.create({ baseURL: "/api" });
+// In dev: Vite proxies /api → localhost:8000 (see vite.config.ts).
+// In prod (Vercel): set VITE_API_BASE_URL to the deployed backend URL,
+// e.g. "https://financial-tracker.fly.dev". Trailing slashes are tolerated.
+const RAW_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
+export const API_BASE_URL = RAW_BASE.replace(/\/+$/, "");
+
+export const api = axios.create({ baseURL: API_BASE_URL });
 
 const TOKEN_KEY = "ft_token";
 

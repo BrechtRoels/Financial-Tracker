@@ -3,8 +3,30 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import settings
 
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-engine = create_engine(settings.database_url, connect_args=connect_args, future=True)
+
+def _build_engine():
+    """Build a SQLAlchemy engine that works for plain SQLite *and* libSQL/Turso.
+
+    A Turso URL looks like:
+        sqlite+libsql://<host>?authToken=<JWT>&secure=true
+    The `sqlalchemy-libsql` driver handles the network layer; we still get a
+    SQLite-compatible dialect so all our existing queries (`strftime`, `iif`,
+    `PRAGMA table_info`) keep working.
+    """
+    url = settings.database_url
+    if url.startswith("sqlite+libsql"):
+        # Network DB — no thread-safety arg, no PRAGMA hack needed.
+        return create_engine(url, future=True, pool_pre_ping=True)
+    if url.startswith("sqlite"):
+        return create_engine(
+            url,
+            connect_args={"check_same_thread": False},
+            future=True,
+        )
+    return create_engine(url, future=True, pool_pre_ping=True)
+
+
+engine = _build_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 
@@ -34,7 +56,7 @@ _SCHEMA_ADDITIONS: list[tuple[str, str, str]] = [
 
 
 def ensure_schema() -> None:
-    """Add any missing columns without touching existing data. SQLite-only."""
+    """Add any missing columns without touching existing data. SQLite/libSQL only."""
     if not settings.database_url.startswith("sqlite"):
         return
     with engine.begin() as conn:

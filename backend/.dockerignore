@@ -1,0 +1,27 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local data — must NOT be baked into the image
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+.env.*
+
+alembic/
+tests/
+
+.git/
+.gitignore
+.DS_Store

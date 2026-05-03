@@ -1,4 +1,4 @@
-import { api, getToken } from "./client";
+import { API_BASE_URL, api, getToken } from "./client";
 import type { ChartSpec } from "../components/AgentChart";
 
 export type ChatSession = {
@@ -128,7 +128,7 @@ export async function streamChat(
   onEvent: (e: StreamEvent) => void,
   opts: { model?: string } = {}
 ): Promise<void> {
-  const resp = await fetch(`/api/chat/sessions/${sessionId}/stream`, {
+  const resp = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/stream`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${getToken() ?? ""}`,
