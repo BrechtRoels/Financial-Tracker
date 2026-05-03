@@ -1,9 +1,12 @@
 import axios from "axios";
 
-// In dev: Vite proxies /api → localhost:8000 (see vite.config.ts).
-// In prod (Vercel): set VITE_API_BASE_URL to the deployed backend URL,
-// e.g. "https://financial-tracker.fly.dev". Trailing slashes are tolerated.
-const RAW_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
+// Dev:  Vite proxies /api → localhost:8000 (see vite.config.ts).
+// Prod: Vercel `experimentalServices` exposes the backend at /_/backend.
+// Override either default by setting VITE_API_BASE_URL.
+const PROD_DEFAULT = "/_/backend";
+const DEV_DEFAULT = "/api";
+const RAW_BASE =
+  import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? DEV_DEFAULT : PROD_DEFAULT);
 export const API_BASE_URL = RAW_BASE.replace(/\/+$/, "");
 
 export const api = axios.create({ baseURL: API_BASE_URL });
