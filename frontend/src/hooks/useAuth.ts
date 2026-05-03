@@ -1,12 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, getToken, setToken } from "../api/client";
 
+export type Me = {
+  id: number;
+  email: string;
+  is_admin: boolean;
+  ai_enabled: boolean;
+  created_at: string;
+};
+
 export function useMe() {
-  return useQuery({
+  return useQuery<Me>({
     queryKey: ["me"],
     queryFn: async () => (await api.get("/auth/me")).data,
     enabled: !!getToken(),
     retry: false,
+    staleTime: 60_000,
   });
 }
 

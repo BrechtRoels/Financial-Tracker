@@ -21,7 +21,7 @@ from ..chat import (
     validate_sql,
 )
 from ..config import settings
-from ..deps import get_current_user, get_db
+from ..deps import get_current_user, get_db, require_ai_user
 from ..genai import llm_complete
 from ..models import ChatMessage, ChatSession, CustomTool, User
 
@@ -326,7 +326,7 @@ def _parse_draft_json(text: str) -> dict:
 @router.post("/tools/draft", response_model=CustomToolUpsert)
 async def draft_tool(
     body: DraftToolRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_ai_user),
 ):
     if not settings.genai_enabled:
         raise HTTPException(status_code=400, detail="AI is unavailable")
@@ -436,7 +436,7 @@ def list_messages(
 async def stream_chat(
     session_id: int,
     body: StreamRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_ai_user),
     db: Session = Depends(get_db),
 ):
     if not settings.genai_enabled:

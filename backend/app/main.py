@@ -2,11 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .db import Base, engine, ensure_schema
-from .routers import accounts, auth, budgets, categories, chat, goals, investments, stats, transactions
+from .db import Base, SessionLocal, engine, ensure_schema
+from .routers import accounts, admin, auth, budgets, categories, chat, goals, investments, stats, transactions
+from .seed import ensure_admin_user
 
 Base.metadata.create_all(bind=engine)
 ensure_schema()
+with SessionLocal() as _bootstrap:
+    ensure_admin_user(_bootstrap)
 
 app = FastAPI(title="Finance Tracker", version="0.1.0")
 
@@ -27,6 +30,7 @@ app.include_router(stats.router)
 app.include_router(goals.router)
 app.include_router(investments.router)
 app.include_router(chat.router)
+app.include_router(admin.router)
 
 
 @app.get("/")

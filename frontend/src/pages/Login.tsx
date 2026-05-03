@@ -55,10 +55,11 @@ export default function Login() {
         </div>
         <form onSubmit={onSubmit} className="flex flex-col gap-3">
           <div>
-            <div className="label mb-1">Email</div>
+            <div className="label mb-1">{mode === "setup" ? "Email" : "Email or username"}</div>
             <input
               className="input"
-              type="email"
+              type={mode === "setup" ? "email" : "text"}
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

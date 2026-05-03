@@ -78,6 +78,8 @@ _SCHEMA_ADDITIONS: list[tuple[str, str, str]] = [
     ("investment_holdings", "last_fx_rate", "last_fx_rate FLOAT"),
     ("accounts", "logo_url", "logo_url VARCHAR(500)"),
     ("transactions", "refund_for_id", "refund_for_id INTEGER REFERENCES transactions(id)"),
+    ("users", "is_admin", "is_admin BOOLEAN DEFAULT 0"),
+    ("users", "ai_enabled", "ai_enabled BOOLEAN DEFAULT 1"),
 ]
 
 

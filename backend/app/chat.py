@@ -382,7 +382,9 @@ def build_agent(
 ) -> Agent[AgentDeps, str]:
     if not settings.genai_enabled:
         raise RuntimeError("GENAI_API_KEY is not set")
-    resolved = model_name or settings.genai_chat_model
+    from .app_settings import effective_chat_model
+
+    resolved = model_name or effective_chat_model()
     valid = {m[0] for m in AVAILABLE_CHAT_MODELS}
     if resolved not in valid:
         raise ValueError(f"Unsupported model: {resolved}")

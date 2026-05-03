@@ -31,7 +31,10 @@ def _extract_text(data: dict) -> str:
 
 
 async def llm_complete(prompt: str, model: str | None = None) -> str:
-    model = model or settings.genai_llm_model
+    if model is None:
+        from .app_settings import effective_llm_model
+
+        model = effective_llm_model()
     headers = {"api-key": settings.genai_api_key, "Content-Type": "application/json"}
     params = {"api-version": settings.genai_api_version} if settings.genai_api_version else {}
     last_err: Exception | None = None
@@ -230,8 +233,10 @@ async def scan_receipt_image(
 
     headers = {"api-key": settings.genai_api_key, "Content-Type": "application/json"}
     params = {"api-version": settings.genai_api_version} if settings.genai_api_version else {}
+    from .app_settings import effective_vision_model
+
     payload = {
-        "model": settings.genai_vision_model,
+        "model": effective_vision_model(),
         "input": [
             {
                 "role": "user",

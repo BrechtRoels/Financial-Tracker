@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
-import { logout } from "../../hooks/useAuth";
+import { logout, useMe } from "../../hooks/useAuth";
 
-const links: { to: string; label: string; hint?: string }[] = [
+const baseLinks: { to: string; label: string; hint?: string }[] = [
   { to: "/accounts", label: "Accounts", hint: "Balances + holdings" },
   { to: "/merchants", label: "Merchants", hint: "Where your money goes" },
   { to: "/budgets", label: "Budgets", hint: "Per-category limits" },
@@ -18,6 +18,10 @@ function ChevronRight() {
 }
 
 export default function MobileMore() {
+  const me = useMe();
+  const links = me.data?.is_admin
+    ? [...baseLinks, { to: "/admin", label: "Admin", hint: "Models + AI access" }]
+    : baseLinks;
   return (
     <div className="flex flex-col gap-4">
       <div className="card p-0 overflow-hidden">

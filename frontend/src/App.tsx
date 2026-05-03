@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import MobileLayout from "./components/mobile/MobileLayout";
+import Admin from "./pages/Admin";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Accounts from "./pages/Accounts";
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/reports" element={<Reports />} />
         <Route path="/budgets" element={<Budgets />} />
         <Route path="/categories" element={<Categories />} />
+        <Route path="/admin" element={<Admin />} />
       </Route>
     </Routes>
   );

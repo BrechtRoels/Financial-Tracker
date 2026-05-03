@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..deps import get_current_user, get_db
+from ..deps import get_current_user, get_db, require_ai_user
 import base64
 
 from ..genai import canonicalize_merchants, enrich_transactions_stream, scan_receipt_image
@@ -582,7 +582,7 @@ _ACCEPTED_IMAGE_TYPES = {
 @router.post("/scan-receipt", response_model=ScanReceiptOut)
 async def scan_receipt(
     file: UploadFile = File(...),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_ai_user),
     db: Session = Depends(get_db),
 ) -> ScanReceiptOut:
     """Take a receipt photo, return structured fields to prefill the add-tx form.
@@ -775,6 +775,8 @@ async def import_csv(
         enrichment: dict[int, dict] = {}
         if use_ai and parsed_rows:
             if not settings.genai_enabled:
+                yield evt("ai_unavailable")
+            elif not getattr(user, "ai_enabled", True):
                 yield evt("ai_unavailable")
             else:
                 categories_payload = [

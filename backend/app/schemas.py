@@ -18,7 +18,9 @@ class UserCreate(BaseModel):
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
-    email: EmailStr
+    email: str
+    is_admin: bool = False
+    ai_enabled: bool = True
     created_at: datetime
 
 

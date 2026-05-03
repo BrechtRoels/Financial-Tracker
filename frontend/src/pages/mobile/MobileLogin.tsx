@@ -55,12 +55,12 @@ export default function MobileLogin() {
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <div>
-          <div className="label mb-1">Email</div>
+          <div className="label mb-1">{mode === "setup" ? "Email" : "Email or username"}</div>
           <input
             className="input h-12"
-            type="email"
+            type={mode === "setup" ? "email" : "text"}
             inputMode="email"
-            autoComplete="email"
+            autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required

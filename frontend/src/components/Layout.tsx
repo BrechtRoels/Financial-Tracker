@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { logout } from "../hooks/useAuth";
+import { logout, useMe } from "../hooks/useAuth";
 
 const STORAGE_KEY = "ft_sidebar_collapsed";
 
@@ -73,6 +73,14 @@ function TagIcon({ className = "h-4 w-4" }: IconProps) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M20 12L12 4H4v8l8 8 8-8z" />
       <circle cx="7.5" cy="7.5" r="1" />
+    </svg>
+  );
+}
+
+function ShieldIcon({ className = "h-4 w-4" }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3l8 3v5c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-3z" />
     </svg>
   );
 }
@@ -152,6 +160,7 @@ function initialCollapsed(): boolean {
 export default function Layout() {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState<boolean>(initialCollapsed);
+  const me = useMe();
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, collapsed ? "1" : "0");
@@ -222,6 +231,24 @@ export default function Layout() {
         </nav>
 
         <div className="mt-auto flex flex-col gap-2 pt-6">
+          {me.data?.is_admin && (
+            <NavLink
+              to="/admin"
+              title={collapsed ? "Admin" : undefined}
+              className={({ isActive }) =>
+                `rounded-lg text-sm transition flex items-center gap-2 ${
+                  collapsed ? "justify-center h-10 w-12 mx-auto" : "px-3 py-2"
+                } ${
+                  isActive
+                    ? "bg-brand-accent text-white"
+                    : "text-subink hover:bg-brand-50 hover:text-ink"
+                }`
+              }
+            >
+              <ShieldIcon />
+              <span className={collapsed ? "hidden" : "inline"}>Admin</span>
+            </NavLink>
+          )}
           <button
             onClick={() => navigate("/chat")}
             title={collapsed ? "Chat" : undefined}
