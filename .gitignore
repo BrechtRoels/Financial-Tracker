@@ -1,0 +1,43 @@
+# macOS
+.DS_Store
+
+# Secrets / local config
+.env
+.env.local
+.env.*.local
+*.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# SQLite databases (contain personal financial data)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+*.log
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+*~
+
+# Build artefacts
+*.tsbuildinfo
