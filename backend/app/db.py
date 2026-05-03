@@ -29,15 +29,17 @@ def _build_engine():
             or os.environ.get("LIBSQL_AUTH_TOKEN")
             or os.environ.get("TURSO_AUTH_TOKEN")
         )
-        secure = (qs.get("secure") or ["true"])[0].lower() == "true"
+        # `secure=true` belongs in the URL query, not connect_args (libsql
+        # DBAPI rejects unknown kwargs). Strip authToken from the URL since we
+        # pass it explicitly; keep `secure` if it was set.
+        retained_qs = {k: v for k, v in qs.items() if k != "authToken"}
+        rebuilt_query = "&".join(f"{k}={v[0]}" for k, v in retained_qs.items())
         clean_url = urlunparse(
-            (parsed.scheme, parsed.netloc, parsed.path or "/", "", "", "")
+            (parsed.scheme, parsed.netloc, parsed.path or "/", "", rebuilt_query, "")
         )
         connect_args: dict = {}
         if auth_token:
             connect_args["auth_token"] = auth_token
-        if secure:
-            connect_args["secure"] = True
         return create_engine(
             clean_url, connect_args=connect_args, future=True, pool_pre_ping=True
         )
