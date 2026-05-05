@@ -80,10 +80,10 @@ export default function EditTransactionModal({ open, onClose, transaction }: Pro
         description: form.description.trim(),
         merchant: form.merchant.trim() || null,
       };
+      payload.amount_cents = toCents(parseFloat(form.amount || "0"));
       if (!isTransfer) {
         payload.account_id = Number(form.account_id);
         payload.category_id = form.category_id ? Number(form.category_id) : null;
-        payload.amount_cents = toCents(parseFloat(form.amount || "0"));
       }
       await api.patch(`/transactions/${transaction.id}`, payload);
       invalidate("transactions", "accounts", "budgets");
@@ -113,8 +113,8 @@ export default function EditTransactionModal({ open, onClose, transaction }: Pro
       <div className="flex flex-col gap-3">
         {isTransfer && (
           <div className="rounded-lg bg-brand-50 border border-line px-3 py-2 text-xs text-subink">
-            This is a self-transfer. Amount and account are locked to keep the pair
-            consistent — only date and description can be changed.
+            Self-transfer. Editing the amount or date updates the matching leg
+            on the other account automatically; the account stays locked.
           </div>
         )}
 
@@ -148,10 +148,11 @@ export default function EditTransactionModal({ open, onClose, transaction }: Pro
               step="0.01"
               value={form.amount}
               onChange={(e) => setForm({ ...form, amount: e.target.value })}
-              disabled={isTransfer}
             />
             <div className="mt-1 text-[11px] text-subink">
-              Negative = expense, positive = income
+              {isTransfer
+                ? "Negative on this leg = leaving this account; the partner row mirrors it."
+                : "Negative = expense, positive = income"}
             </div>
           </div>
           <div>
