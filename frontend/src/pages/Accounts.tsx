@@ -54,6 +54,25 @@ export default function Accounts() {
     ({ id, ...v }: any) => api.patch(`/accounts/${id}`, v).then((r) => r.data),
     ["accounts"]
   );
+  const remove = useMutateResource(
+    ({ id, force }: { id: number; force: boolean }) =>
+      api.delete(`/accounts/${id}`, { params: force ? { force: true } : {} }).then((r) => r.data),
+    ["accounts", "transactions", "budgets"]
+  );
+
+  async function tryDelete() {
+    if (!editing) return;
+    if (!confirm(`Delete "${editing.name}"? Any transactions on this account will also be deleted. This can't be undone.`)) {
+      return;
+    }
+    try {
+      await remove.mutateAsync({ id: editing.id, force: true });
+      setOpen(false);
+      setEditing(null);
+    } catch (e: any) {
+      alert(e.response?.data?.detail ?? e.message ?? "Delete failed");
+    }
+  }
 
   async function submit() {
     const payload = {
@@ -211,9 +230,22 @@ export default function Accounts() {
               onChange={(e) => setForm({ ...form, opening: e.target.value })}
             />
           </div>
-          <button className="btn-primary mt-2" onClick={submit} disabled={!form.name}>
-            {editing ? "Save changes" : "Create"}
-          </button>
+          <div className="mt-2 flex items-center gap-2">
+            {editing && (
+              <button
+                type="button"
+                className="btn-ghost text-neg"
+                onClick={tryDelete}
+                disabled={remove.isPending}
+              >
+                {remove.isPending ? "Deleting…" : "Delete account"}
+              </button>
+            )}
+            <span className="flex-1" />
+            <button className="btn-primary" onClick={submit} disabled={!form.name}>
+              {editing ? "Save changes" : "Create"}
+            </button>
+          </div>
         </div>
       </Modal>
     </div>

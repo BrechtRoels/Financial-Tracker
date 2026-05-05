@@ -1,9 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import delete, func
 from sqlalchemy.orm import Session
 
 from ..deps import get_current_user, get_db
-from ..models import Account, InvestmentHolding, Transaction, User
+from ..models import (
+    Account,
+    Budget,
+    CsvImport,
+    InvestmentHolding,
+    RecurringClassification,
+    SavingsGoal,
+    Transaction,
+    User,
+)
 from ..schemas import AccountCreate, AccountOut, AccountUpdate
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
@@ -107,14 +116,50 @@ def update_account(
 
 @router.delete("/{account_id}")
 def delete_account(
-    account_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    account_id: int,
+    force: bool = Query(False, description="Cascade-delete attached transactions, holdings, etc."),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     acc = db.query(Account).filter(Account.id == account_id, Account.user_id == user.id).first()
     if not acc:
         raise HTTPException(status_code=404, detail="Not found")
+
     has_tx = db.query(Transaction).filter(Transaction.account_id == acc.id).first()
-    if has_tx:
-        raise HTTPException(status_code=400, detail="Account has transactions; archive instead")
+    if has_tx and not force:
+        raise HTTPException(
+            status_code=400,
+            detail="Account has transactions. Pass ?force=true to also delete them.",
+        )
+
+    if force:
+        # Refund-link cleanup: any transaction whose `refund_for_id` points
+        # at a row we're about to delete must lose the link.
+        deleted_tx_ids = [
+            r[0]
+            for r in db.query(Transaction.id)
+            .filter(Transaction.account_id == acc.id)
+            .all()
+        ]
+        if deleted_tx_ids:
+            db.query(Transaction).filter(
+                Transaction.refund_for_id.in_(deleted_tx_ids)
+            ).update({Transaction.refund_for_id: None}, synchronize_session=False)
+
+        db.execute(delete(Transaction).where(Transaction.account_id == acc.id))
+        db.execute(delete(InvestmentHolding).where(InvestmentHolding.account_id == acc.id))
+        db.execute(delete(CsvImport).where(CsvImport.account_id == acc.id))
+        db.execute(
+            delete(RecurringClassification).where(RecurringClassification.user_id == user.id)
+        )
+        # Detach savings goals; don't delete them — the goal is still meaningful
+        # without an explicit account anchor.
+        db.query(SavingsGoal).filter(SavingsGoal.account_id == acc.id).update(
+            {SavingsGoal.account_id: None}, synchronize_session=False
+        )
+        # Budgets reference categories, not accounts — nothing to do there.
+        _ = Budget  # silence unused-import lint when force=False at type time
+
     db.delete(acc)
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "force": force}
