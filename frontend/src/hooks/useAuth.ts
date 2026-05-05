@@ -7,6 +7,7 @@ export type Me = {
   is_admin: boolean;
   ai_enabled: boolean;
   month_start_day: number;
+  default_account_id: number | null;
   created_at: string;
 };
 

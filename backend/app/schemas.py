@@ -22,11 +22,13 @@ class UserOut(BaseModel):
     is_admin: bool = False
     ai_enabled: bool = True
     month_start_day: int = 1
+    default_account_id: int | None = None
     created_at: datetime
 
 
 class UserUpdate(BaseModel):
     month_start_day: int | None = Field(default=None, ge=1, le=28)
+    default_account_id: int | None = None
 
 
 class AccountCreate(BaseModel):

@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import AccountLogo, { BANK_PRESETS } from "../components/AccountLogo";
 import HoldingsSection from "../components/HoldingsSection";
 import Modal from "../components/Modal";
 import Select from "../components/Select";
 import { api } from "../api/client";
 import { useAccounts, useMutateResource } from "../api/hooks";
+import { useMe } from "../hooks/useAuth";
 import { ACCOUNT_TYPES, Account } from "../api/types";
 import { formatEUR, fromCents, toCents } from "../lib/format";
 
@@ -28,9 +30,17 @@ const emptyForm: FormState = {
 
 export default function Accounts() {
   const { data } = useAccounts();
+  const me = useMe();
+  const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Account | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const defaultId = me.data?.default_account_id ?? null;
+
+  async function setDefault(id: number | null) {
+    await api.patch("/auth/me", { default_account_id: id });
+    qc.invalidateQueries({ queryKey: ["me"] });
+  }
 
   useEffect(() => {
     if (editing) {
@@ -132,8 +142,18 @@ export default function Accounts() {
         </div>
       </div>
 
-      <Section title="Assets" list={assets} onEdit={openEdit} />
-      <Section title="Liabilities" list={liab} onEdit={openEdit} />
+      <Section
+        title="Assets"
+        list={assets}
+        defaultId={defaultId}
+        onEdit={openEdit}
+      />
+      <Section
+        title="Liabilities"
+        list={liab}
+        defaultId={defaultId}
+        onEdit={openEdit}
+      />
 
       <HoldingsSection />
 
@@ -230,6 +250,20 @@ export default function Accounts() {
               onChange={(e) => setForm({ ...form, opening: e.target.value })}
             />
           </div>
+          {editing && (
+            <label className="flex items-center gap-2 text-sm text-subink select-none cursor-pointer">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-brand-accent"
+                checked={defaultId === editing.id}
+                onChange={(e) =>
+                  setDefault(e.target.checked ? editing.id : null)
+                }
+              />
+              <span>Default for new transactions</span>
+            </label>
+          )}
+
           <div className="mt-2 flex items-center gap-2">
             {editing && (
               <button
@@ -260,10 +294,12 @@ function formatIbanDisplay(iban: string | null): string | null {
 function Section({
   title,
   list,
+  defaultId,
   onEdit,
 }: {
   title: string;
   list: Account[];
+  defaultId: number | null;
   onEdit: (a: Account) => void;
 }) {
   if (!list?.length) return null;
@@ -280,7 +316,14 @@ function Section({
             <div className="flex items-start gap-3">
               <AccountLogo logoUrl={a.logo_url} name={a.name} size={40} />
               <div className="min-w-0 flex-1">
-                <div className="font-medium truncate">{a.name}</div>
+                <div className="flex items-center gap-2">
+                  <div className="font-medium truncate">{a.name}</div>
+                  {defaultId === a.id && (
+                    <span className="chip bg-brand-accent text-white text-[10px] px-1.5 py-0">
+                      default
+                    </span>
+                  )}
+                </div>
                 <div className="text-xs text-subink capitalize">{a.type.replace("_", " ")}</div>
                 {a.iban && (
                   <div className="mt-1 text-[11px] font-mono text-subink truncate">

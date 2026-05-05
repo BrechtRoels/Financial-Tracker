@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import EditTransactionModal from "../components/EditTransactionModal";
 import LinkRefundModal from "../components/LinkRefundModal";
 import Modal from "../components/Modal";
@@ -7,6 +7,7 @@ import ProgressBar from "../components/ProgressBar";
 import { API_BASE_URL, api, getToken } from "../api/client";
 import { useAccounts, useCategories, useInvalidate, useMutateResource, useTransactions } from "../api/hooks";
 import { scanReceipt } from "../api/receipts";
+import { useMe } from "../hooks/useAuth";
 import type { Transaction } from "../api/types";
 import { formatDate, formatEUR, fromCents, toCents, todayISO } from "../lib/format";
 
@@ -87,6 +88,15 @@ export default function Transactions() {
   const accounts = useAccounts();
   const categories = useCategories();
   const txs = useTransactions(filter);
+  const me = useMe();
+
+  // Prefill the new-transaction form's account from the user's chosen default.
+  // Resets each time the modal opens.
+  useEffect(() => {
+    if (!open || editing) return;
+    const fallback = me.data?.default_account_id ?? accounts.data?.[0]?.id ?? "";
+    setForm((f) => (f.account_id === "" ? { ...f, account_id: fallback as any } : f));
+  }, [open, editing, me.data?.default_account_id, accounts.data]);
 
   const accountMap = useMemo(
     () => Object.fromEntries((accounts.data ?? []).map((a) => [a.id, a])),

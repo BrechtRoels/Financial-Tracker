@@ -1,10 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import LinkRefundModal from "../LinkRefundModal";
 import MobileSheet from "./MobileSheet";
 import Select from "../Select";
 import { api } from "../../api/client";
 import { useAccounts, useCategories, useMutateResource } from "../../api/hooks";
 import { scanReceipt } from "../../api/receipts";
+import { useMe } from "../../hooks/useAuth";
 import type { Transaction } from "../../api/types";
 import { fromCents, toCents, todayISO } from "../../lib/format";
 
@@ -50,11 +51,19 @@ export default function AddTransactionSheet({
 }) {
   const accounts = useAccounts();
   const categories = useCategories();
+  const me = useMe();
   const [form, setForm] = useState<TxForm>(empty);
   const [err, setErr] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanHint, setScanHint] = useState<string | null>(null);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Prefill account from the user's chosen default each time the sheet opens.
+  useEffect(() => {
+    if (!open) return;
+    const fallback = me.data?.default_account_id ?? accounts.data?.[0]?.id ?? "";
+    setForm((f) => (f.account_id === "" ? { ...f, account_id: fallback as any } : f));
+  }, [open, me.data?.default_account_id, accounts.data]);
   const [linkingTx, setLinkingTx] = useState<Transaction | null>(null);
 
   async function onScanFile(e: React.ChangeEvent<HTMLInputElement>) {

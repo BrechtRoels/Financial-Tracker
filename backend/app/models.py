@@ -39,6 +39,10 @@ class User(Base):
     # Day-of-month (1-28) the user considers their financial month to start.
     # Default 1 = calendar month. 27 = paycheck-anchored.
     month_start_day: Mapped[int] = mapped_column(Integer, default=1)
+    # Account pre-selected when adding a new transaction. NULL = pick manually.
+    default_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("accounts.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

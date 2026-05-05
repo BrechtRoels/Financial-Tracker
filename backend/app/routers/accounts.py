@@ -132,6 +132,10 @@ def delete_account(
             detail="Account has transactions. Pass ?force=true to also delete them.",
         )
 
+    # If this account was the user's default for new transactions, clear it.
+    if user.default_account_id == acc.id:
+        user.default_account_id = None
+
     if force:
         # Refund-link cleanup: any transaction whose `refund_for_id` points
         # at a row we're about to delete must lose the link.

@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from ..deps import get_current_user, get_db
-from ..models import User
+from ..models import Account, User
 from ..schemas import Token, UserCreate, UserOut, UserUpdate
 from ..security import create_access_token, hash_password, verify_password
 from ..seed import seed_default_categories
@@ -77,6 +77,18 @@ def update_me(
 ) -> User:
     if body.month_start_day is not None:
         user.month_start_day = body.month_start_day
+    if "default_account_id" in body.model_fields_set:
+        if body.default_account_id is None:
+            user.default_account_id = None
+        else:
+            owned = (
+                db.query(Account)
+                .filter(Account.id == body.default_account_id, Account.user_id == user.id)
+                .first()
+            )
+            if not owned:
+                raise HTTPException(status_code=400, detail="Account not found")
+            user.default_account_id = owned.id
     db.commit()
     db.refresh(user)
     return user
