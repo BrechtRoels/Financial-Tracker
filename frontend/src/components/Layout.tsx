@@ -171,7 +171,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex">
       <aside
-        className={`${asideWidth} shrink-0 border-r border-line bg-surface flex flex-col transition-[width] duration-200 ease-out ${collapsed ? "px-2 py-6" : "p-6"}`}
+        className={`${asideWidth} shrink-0 sticky top-0 h-screen self-start border-r border-line bg-surface flex flex-col overflow-y-auto transition-[width] duration-200 ease-out ${collapsed ? "px-2 py-6" : "p-6"}`}
       >
         <div className={`mb-10 flex items-start ${collapsed ? "justify-center" : "justify-between"}`}>
           {collapsed ? (
