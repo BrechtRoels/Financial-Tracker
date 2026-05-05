@@ -82,10 +82,10 @@ export default function MobileEditTransactionSheet({
         description: form.description.trim(),
         merchant: form.merchant.trim() || null,
       };
+      payload.amount_cents = toCents(parseFloat(form.amount || "0"));
       if (!isTransfer) {
         payload.account_id = Number(form.account_id);
         payload.category_id = form.category_id ? Number(form.category_id) : null;
-        payload.amount_cents = toCents(parseFloat(form.amount || "0"));
       }
       await api.patch(`/transactions/${transaction.id}`, payload);
       invalidate("transactions", "accounts", "budgets");
@@ -131,7 +131,8 @@ export default function MobileEditTransactionSheet({
       <div className="flex flex-col gap-4">
         {isTransfer && (
           <div className="rounded-lg bg-brand-50 border border-line px-3 py-2 text-xs text-subink">
-            Self-transfer — amount and account locked.
+            Self-transfer. Editing amount or date updates the matching leg on the
+            other account; account stays locked.
           </div>
         )}
 
@@ -143,10 +144,11 @@ export default function MobileEditTransactionSheet({
             inputMode="decimal"
             value={form.amount}
             onChange={(e) => setForm({ ...form, amount: e.target.value.replace(",", ".") })}
-            disabled={isTransfer}
           />
           <div className="mt-1 text-[11px] text-subink">
-            Negative = expense, positive = income
+            {isTransfer
+              ? "Negative on this leg = money leaving this account; the partner row mirrors it."
+              : "Negative = expense, positive = income"}
           </div>
         </div>
 

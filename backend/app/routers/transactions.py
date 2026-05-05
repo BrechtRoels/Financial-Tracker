@@ -88,8 +88,34 @@ def update_transaction(
     updates = data.model_dump(exclude_unset=True)
     if "account_id" in updates:
         _own_account(db, user.id, updates["account_id"])
+
+    # Transfers come in pairs: keep the partner row in sync for amount and date
+    # so the two legs never drift. Account / category / merchant edits stay
+    # local to the row the user clicked on.
+    partner = None
+    if tx.transfer_group_id:
+        partner = (
+            db.query(Transaction)
+            .filter(
+                Transaction.user_id == user.id,
+                Transaction.transfer_group_id == tx.transfer_group_id,
+                Transaction.id != tx.id,
+            )
+            .first()
+        )
+
     for k, v in updates.items():
         setattr(tx, k, v)
+
+    if partner:
+        if "amount_cents" in updates:
+            # Sign-flip: partner row mirrors this leg.
+            partner.amount_cents = -int(updates["amount_cents"])
+        if "occurred_on" in updates:
+            partner.occurred_on = updates["occurred_on"]
+        if "description" in updates:
+            partner.description = updates["description"]
+
     db.commit()
     db.refresh(tx)
     return tx
