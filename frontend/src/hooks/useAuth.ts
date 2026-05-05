@@ -6,6 +6,7 @@ export type Me = {
   email: string;
   is_admin: boolean;
   ai_enabled: boolean;
+  month_start_day: number;
   created_at: string;
 };
 

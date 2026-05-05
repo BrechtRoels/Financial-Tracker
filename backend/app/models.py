@@ -36,6 +36,9 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     ai_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Day-of-month (1-28) the user considers their financial month to start.
+    # Default 1 = calendar month. 27 = paycheck-anchored.
+    month_start_day: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -68,6 +71,8 @@ class Category(Base):
     kind: Mapped[str] = mapped_column(String(20))
     color: Mapped[str] = mapped_column(String(16), default="#C8E6D0")
     icon: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    # 50/30/20 bucket: 'need' / 'want' / 'save', or NULL when untagged.
+    bucket: Mapped[str | None] = mapped_column(String(8), nullable=True, index=True)
 
 
 class Transaction(Base):

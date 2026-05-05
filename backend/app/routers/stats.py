@@ -27,11 +27,15 @@ from ..models import (
     User,
 )
 from ..schemas import NetWorthPoint, SpendingByCategory, SummaryOut
+from ..timeutils import month_window
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 
-def _month_bounds(m: date) -> tuple[date, date]:
+def _month_bounds(m: date, start_day: int = 1) -> tuple[date, date]:
+    """Financial-month window. With start_day=1 == calendar month."""
+    if start_day and start_day != 1:
+        return month_window(m, start_day)
     start = m.replace(day=1)
     end = date(start.year, start.month, monthrange(start.year, start.month)[1])
     return start, end
@@ -39,11 +43,11 @@ def _month_bounds(m: date) -> tuple[date, date]:
 
 @router.get("/summary", response_model=SummaryOut)
 def summary(
-    month: date = Query(default_factory=lambda: date.today().replace(day=1)),
+    month: date = Query(default_factory=date.today),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    start, end = _month_bounds(month)
+    start, end = _month_bounds(month, getattr(user, "month_start_day", 1) or 1)
     q = db.query(Transaction).filter(
         Transaction.user_id == user.id,
         Transaction.occurred_on >= start,
@@ -109,6 +113,91 @@ def summary(
         top_categories=top,
         avg_monthly_expenses_cents=avg_monthly_expenses,
         months_sampled=months_sampled,
+    )
+
+
+class BucketBreakdown(BaseModel):
+    need_cents: int
+    want_cents: int
+    save_cents: int
+    untagged_cents: int
+    income_cents: int
+    target_need_pct: int = 50
+    target_want_pct: int = 30
+    target_save_pct: int = 20
+    period_start: date
+    period_end: date
+
+
+@router.get("/buckets", response_model=BucketBreakdown)
+def buckets(
+    month: date = Query(default_factory=date.today),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """50/30/20 split for the current financial month.
+
+    Sums non-transfer expense transactions by their category's `bucket`
+    (need / want / save). Income is reported separately so the frontend can
+    compute "save = income − expenses" if no category is tagged save.
+    """
+    start, end = _month_bounds(month, getattr(user, "month_start_day", 1) or 1)
+
+    rows = (
+        db.query(Category.bucket, func.coalesce(func.sum(Transaction.amount_cents), 0))
+        .outerjoin(Transaction, Transaction.category_id == Category.id)
+        .filter(
+            Transaction.user_id == user.id,
+            Transaction.occurred_on >= start,
+            Transaction.occurred_on <= end,
+            Transaction.transfer_group_id.is_(None),
+            Transaction.amount_cents < 0,
+        )
+        .group_by(Category.bucket)
+        .all()
+    )
+
+    bucket_totals = {"need": 0, "want": 0, "save": 0, None: 0}
+    for bucket, amt in rows:
+        bucket_totals[bucket] = bucket_totals.get(bucket, 0) + (-int(amt))
+
+    # Untagged expenses also include transactions with NULL category_id.
+    untagged_no_cat = (
+        db.query(func.coalesce(func.sum(Transaction.amount_cents), 0))
+        .filter(
+            Transaction.user_id == user.id,
+            Transaction.occurred_on >= start,
+            Transaction.occurred_on <= end,
+            Transaction.transfer_group_id.is_(None),
+            Transaction.amount_cents < 0,
+            Transaction.category_id.is_(None),
+        )
+        .scalar()
+        or 0
+    )
+    bucket_totals[None] = bucket_totals.get(None, 0) + (-int(untagged_no_cat))
+
+    income_total = (
+        db.query(func.coalesce(func.sum(Transaction.amount_cents), 0))
+        .filter(
+            Transaction.user_id == user.id,
+            Transaction.occurred_on >= start,
+            Transaction.occurred_on <= end,
+            Transaction.transfer_group_id.is_(None),
+            Transaction.amount_cents > 0,
+        )
+        .scalar()
+        or 0
+    )
+
+    return BucketBreakdown(
+        need_cents=bucket_totals["need"],
+        want_cents=bucket_totals["want"],
+        save_cents=bucket_totals["save"],
+        untagged_cents=bucket_totals[None],
+        income_cents=int(income_total),
+        period_start=start,
+        period_end=end,
     )
 
 

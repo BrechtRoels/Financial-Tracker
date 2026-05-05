@@ -43,12 +43,28 @@ export type Quote = {
   long_name?: string | null;
 };
 
+export type Bucket = "need" | "want" | "save";
+
 export type Category = {
   id: number;
   name: string;
   kind: "income" | "expense";
   color: string;
   icon: string | null;
+  bucket: Bucket | null;
+};
+
+export type BucketBreakdown = {
+  need_cents: number;
+  want_cents: number;
+  save_cents: number;
+  untagged_cents: number;
+  income_cents: number;
+  target_need_pct: number;
+  target_want_pct: number;
+  target_save_pct: number;
+  period_start: string;
+  period_end: string;
 };
 
 export type Transaction = {

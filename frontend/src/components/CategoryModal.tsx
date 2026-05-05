@@ -16,6 +16,13 @@ const KIND_OPTIONS = [
   { value: "income", label: "Income" },
 ];
 
+const BUCKET_OPTIONS = [
+  { value: "", label: "— Untagged —" },
+  { value: "need", label: "Need (50% target)" },
+  { value: "want", label: "Want (30% target)" },
+  { value: "save", label: "Save (20% target)" },
+];
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -26,9 +33,10 @@ type FormState = {
   name: string;
   kind: "expense" | "income";
   color: string;
+  bucket: "" | "need" | "want" | "save";
 };
 
-const empty: FormState = { name: "", kind: "expense", color: PALETTE[0] };
+const empty: FormState = { name: "", kind: "expense", color: PALETTE[0], bucket: "" };
 
 export default function CategoryModal({ open, onClose, editing }: Props) {
   const invalidate = useInvalidate();
@@ -44,6 +52,7 @@ export default function CategoryModal({ open, onClose, editing }: Props) {
         name: editing.name,
         kind: (editing.kind as "expense" | "income") ?? "expense",
         color: editing.color || PALETTE[0],
+        bucket: (editing.bucket as FormState["bucket"]) || "",
       });
     } else {
       setForm(empty);
@@ -54,18 +63,16 @@ export default function CategoryModal({ open, onClose, editing }: Props) {
     setBusy(true);
     setErr(null);
     try {
+      const payload = {
+        name: form.name.trim(),
+        kind: form.kind,
+        color: form.color,
+        bucket: form.bucket || null,
+      };
       if (editing) {
-        await api.patch(`/categories/${editing.id}`, {
-          name: form.name.trim(),
-          kind: form.kind,
-          color: form.color,
-        });
+        await api.patch(`/categories/${editing.id}`, payload);
       } else {
-        await api.post("/categories", {
-          name: form.name.trim(),
-          kind: form.kind,
-          color: form.color,
-        });
+        await api.post("/categories", payload);
       }
       invalidate("categories", "transactions");
       onClose();
@@ -110,6 +117,20 @@ export default function CategoryModal({ open, onClose, editing }: Props) {
             options={KIND_OPTIONS}
           />
         </div>
+
+        {form.kind === "expense" && (
+          <div>
+            <div className="label mb-1">Bucket (50/30/20 method)</div>
+            <Select
+              value={form.bucket}
+              onChange={(v) => setForm({ ...form, bucket: v as FormState["bucket"] })}
+              options={BUCKET_OPTIONS}
+            />
+            <div className="text-[11px] text-subink mt-1">
+              Group categories into Needs (rent, food, transport), Wants (dining, entertainment), and Save (investments). The dashboard tracks the split.
+            </div>
+          </div>
+        )}
 
         <div>
           <div className="label mb-1">Colour</div>

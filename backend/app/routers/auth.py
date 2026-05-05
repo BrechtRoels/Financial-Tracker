@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from ..deps import get_current_user, get_db
 from ..models import User
-from ..schemas import Token, UserCreate, UserOut
+from ..schemas import Token, UserCreate, UserOut, UserUpdate
 from ..security import create_access_token, hash_password, verify_password
 from ..seed import seed_default_categories
 
@@ -66,4 +66,17 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
 
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)) -> User:
+    return user
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(
+    body: UserUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    if body.month_start_day is not None:
+        user.month_start_day = body.month_start_day
+    db.commit()
+    db.refresh(user)
     return user

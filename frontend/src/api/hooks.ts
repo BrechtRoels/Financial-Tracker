@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import { listGoals, listLocations, listRecurring } from "./goals";
 import { listHoldings } from "./investments";
-import type { Account, Anomaly, Budget, Category, Holding, Insight, LocationItem, MerchantSummary, MonthlySpending, NetWorthForecast, NetWorthPoint, RecurringItem, RunwayOut, SavingsGoal, SpendingByCategory, Summary, Transaction } from "./types";
+import type { Account, Anomaly, Budget, BucketBreakdown, Category, Holding, Insight, LocationItem, MerchantSummary, MonthlySpending, NetWorthForecast, NetWorthPoint, RecurringItem, RunwayOut, SavingsGoal, SpendingByCategory, Summary, Transaction } from "./types";
 
 export const useAccounts = () =>
   useQuery<Account[]>({ queryKey: ["accounts"], queryFn: async () => (await api.get("/accounts")).data });
@@ -88,6 +88,14 @@ export const useRunway = () =>
   useQuery<RunwayOut>({
     queryKey: ["runway"],
     queryFn: async () => (await api.get("/stats/runway")).data,
+    staleTime: 60_000,
+  });
+
+export const useBuckets = (month?: string) =>
+  useQuery<BucketBreakdown>({
+    queryKey: ["buckets", month ?? "current"],
+    queryFn: async () =>
+      (await api.get("/stats/buckets", { params: month ? { month } : undefined })).data,
     staleTime: 60_000,
   });
 

@@ -80,6 +80,8 @@ _SCHEMA_ADDITIONS: list[tuple[str, str, str]] = [
     ("transactions", "refund_for_id", "refund_for_id INTEGER REFERENCES transactions(id)"),
     ("users", "is_admin", "is_admin BOOLEAN DEFAULT 0"),
     ("users", "ai_enabled", "ai_enabled BOOLEAN DEFAULT 1"),
+    ("users", "month_start_day", "month_start_day INTEGER DEFAULT 1"),
+    ("categories", "bucket", "bucket VARCHAR(8)"),
 ]
 
 

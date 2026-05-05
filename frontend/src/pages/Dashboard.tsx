@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import AiSummaryCard from "../components/AiSummaryCard";
 import AnomalyFeed from "../components/AnomalyFeed";
+import BucketCard from "../components/BucketCard";
 import GoalsCard from "../components/GoalsCard";
 import InsightsCard from "../components/InsightsCard";
 import LocationsCard from "../components/LocationsCard";
@@ -179,6 +180,12 @@ export default function Dashboard() {
           <RunwayCard />
         </div>
         <AnomalyFeed />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <BucketCard />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

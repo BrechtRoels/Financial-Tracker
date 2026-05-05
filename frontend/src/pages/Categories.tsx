@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import CategoryModal from "../components/CategoryModal";
 import EditTransactionModal from "../components/EditTransactionModal";
+import MonthStartPicker from "../components/MonthStartPicker";
 import { useAccounts, useCategories, useTransactions } from "../api/hooks";
 import type { Category, Transaction } from "../api/types";
 import { formatDate, formatEUR } from "../lib/format";
@@ -66,6 +67,8 @@ export default function Categories() {
           + New category
         </button>
       </header>
+
+      <MonthStartPicker />
 
       <Group
         title="Expenses"

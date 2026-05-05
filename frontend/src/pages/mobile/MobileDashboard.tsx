@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import BucketCard from "../../components/BucketCard";
 import {
   useAccounts,
   useCategories,
@@ -194,6 +195,8 @@ export default function MobileDashboard() {
           )}
         </ul>
       </div>
+
+      <BucketCard />
 
       {(insightsQuery.data ?? []).length > 0 && (
         <div className="card p-4">

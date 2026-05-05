@@ -21,7 +21,12 @@ class UserOut(BaseModel):
     email: str
     is_admin: bool = False
     ai_enabled: bool = True
+    month_start_day: int = 1
     created_at: datetime
+
+
+class UserUpdate(BaseModel):
+    month_start_day: int | None = Field(default=None, ge=1, le=28)
 
 
 class AccountCreate(BaseModel):
@@ -55,11 +60,15 @@ class AccountOut(BaseModel):
     holdings_value_cents: int = 0  # Σ market value of stock holdings (investment accounts)
 
 
+_VALID_BUCKETS = {"need", "want", "save", None}
+
+
 class CategoryCreate(BaseModel):
     name: str
     kind: str
     color: str = "#C8E6D0"
     icon: str | None = None
+    bucket: str | None = None
 
 
 class CategoryUpdate(BaseModel):
@@ -67,6 +76,7 @@ class CategoryUpdate(BaseModel):
     kind: str | None = None
     color: str | None = None
     icon: str | None = None
+    bucket: str | None = None
 
 
 class CategoryOut(BaseModel):
@@ -76,6 +86,7 @@ class CategoryOut(BaseModel):
     kind: str
     color: str
     icon: str | None
+    bucket: str | None = None
 
 
 class TransactionCreate(BaseModel):
